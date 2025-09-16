@@ -10,12 +10,8 @@ from azure.ai.projects import AIProjectClient
 
 # Placeholder for your summarization function.
 # Replace this with your actual function that takes a WAV file path and returns the summary.
-def summarize_audio(audio_data,userprompt):
-    # Your code here to summarize the audio file using LLM or whatever method you have.
-    # For example:
-    # - Load the WAV file
-    # - Transcribe or process it
-    # - Summarize with LLM
+def summarize_audio(audio_data,sysprompt,userprompt):
+    # Code to summarize the audio file using LLM and Azure OpenAI
 
     try: 
 
@@ -39,8 +35,11 @@ def summarize_audio(audio_data,userprompt):
             
 
             # Initialize prompts
-            #system_message = "You are an AI assistant for a produce supplier company."
-            system_message = "You are an AI assistant with a charter to clearly analyse the customer enquiry."
+            if sysprompt:
+                system_message = sysprompt
+            else:
+                system_message = "You are an AI assistant with a charter to clearly analyse the customer enquiry."
+            
             prompt = ""
 
             # Loop until the user types 'quit'
@@ -86,7 +85,6 @@ def summarize_audio(audio_data,userprompt):
                 
     except Exception as ex:
             print(ex)
-    # return "This is a placeholder summary of the audio file at: " + wav_path
     return response.choices[0].message.content
 
 def encode_audio(audio_file,action):
@@ -109,17 +107,11 @@ def download_wav_from_url(url):
     try:
         response = requests.get(url, stream=True)
         response.raise_for_status()
-        # Create a temporary file
-        # fd, temp_path = tempfile.mkstemp(suffix=".wav")
-        # with os.fdopen(fd, 'wb') as temp_file:
-        #     for chunk in response.iter_content(chunk_size=8192):
-        #         temp_file.write(chunk)
-        # return temp_path
         return response.content
     except Exception as e:
         raise ValueError(f"Failed to download WAV from URL: {str(e)}")
 
-def process_audio(upload_audio, record_audio, url, userprompt):
+def process_audio(upload_audio, record_audio, url,sysprompt,userprompt):
     wav_path = None
     temp_files = []  # To clean up temp files later if needed
     
@@ -139,7 +131,7 @@ def process_audio(upload_audio, record_audio, url, userprompt):
         return "Please provide an audio file via upload, recording, or URL."
     
     try:
-        summary = summarize_audio(audio_data,userprompt)
+        summary = summarize_audio(audio_data,sysprompt,userprompt)
         return summary
     finally:
         # Optional: Clean up temp files
@@ -159,14 +151,16 @@ with gr.Blocks(title="Audio Summarizer UI") as demo:
         with gr.Column():
             url_input = gr.Textbox(label="Enter URL to WAV File", placeholder="https://example.com/audio.wav")
         with gr.Column():
-            userprompt_input = gr.Textbox(label="Enter User Prompt", placeholder="Ask a question about the audio")
+            userprompt_input = gr.Textbox(label="Enter User Prompt", placeholder="Ask a question about the audio",value="Summarize the audio content")
+        with gr.Column():
+            sysprompt_input = gr.Textbox(label="Enter System Prompt",value="You are an AI assistant with a listening charter to clearly analyse the customer enquiry.")
     
     submit_btn = gr.Button("Summarize")
     output = gr.Textbox(label="Summary", lines=10)
     
     submit_btn.click(
         fn=process_audio,
-        inputs=[upload_audio, record_audio, url_input,userprompt_input],
+        inputs=[upload_audio, record_audio, url_input,sysprompt_input,userprompt_input],
         outputs=output
     )
 
