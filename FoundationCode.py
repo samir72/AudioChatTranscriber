@@ -1,12 +1,12 @@
-from dotenv import load_dotenv
+# Add references
+from azure.identity import DefaultAzureCredential
+from azure.ai.projects import AIProjectClient
 import gradio as gr
+from dotenv import load_dotenv
 import requests
 import os
 import tempfile
 import base64
-# Add references
-from azure.identity import DefaultAzureCredential
-from azure.ai.projects import AIProjectClient
 
 # Placeholder for your summarization function.
 # Replace this with your actual function that takes a WAV file path and returns the summary.
