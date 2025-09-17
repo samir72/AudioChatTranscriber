@@ -2,6 +2,7 @@ import os
 import base64
 import tempfile
 import requests
+from datetime import datetime
 import gradio as gr
 from dotenv import load_dotenv
 from openai import AzureOpenAI  # official OpenAI SDK, works with Azure endpoints
@@ -50,7 +51,7 @@ def summarize_audio_b64(audio_b64: str, sys_prompt: str, user_prompt: str) -> st
                 },
             ],
         )
-
+        print(f"Azure API call at {datetime.now()}: prompt_length={len(user_prompt)}, audio_size={len(audio_b64)}")
         return response.choices[0].message.content
 
     except Exception as ex:
