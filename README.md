@@ -1,108 +1,194 @@
-Audio Summarizer UI
-A web-based application built with Gradio and Azure AI to summarize audio content from uploaded WAV files, microphone recordings, or URLs. The application uses Azure OpenAI to process and generate summaries of audio data based on user-defined prompts.
-Table of Contents
+# Audio Summarizer UI (Azure OpenAI + Gradio)
 
-About the Project
-Features
-Getting Started
-Prerequisites
-Installation
+A simple web app to **summarize audio** from three sources—**file upload**, **microphone recording**, or **URL download**—using **Azure OpenAI** via the `azure.ai.projects` client and a friendly **Gradio** UI.
 
+---
 
-Usage
-Contributing
-License
-Contact
-Acknowledgments
+## ✨ Features
 
-About the Project
-This project provides a user-friendly interface for summarizing audio files (in WAV or MP3 format) using Azure's AI services and OpenAI's language models. Users can upload audio files, record audio directly, or provide a URL to an audio file. The application processes the audio, encodes it to base64, and sends it to Azure OpenAI for summarization based on customizable system and user prompts.
-Built With
+- Upload a local WAV file, record from mic, or provide a WAV/MP3 URL
+- Converts audio to Base64 and sends it to Azure OpenAI as multimodal input
+- Configurable **system** and **user** prompts
+- Clean, minimal Gradio UI
+- Environment-based configuration; uses `DefaultAzureCredential` (no raw keys required)
 
-Python 3.8+
-Gradio for the web interface
-Azure AI Projects for AI processing
-Azure Identity for authentication
-python-dotenv for environment variable management
-Requests for HTTP requests
+---
 
-Features
+## 🧭 Architecture Overview
 
-Upload WAV/MP3 files for summarization
-Record audio directly from the microphone
-Summarize audio from a provided URL
-Customizable system and user prompts for tailored summarization
-Integration with Azure OpenAI for robust audio analysis
-Clean and intuitive Gradio-based UI
+```
+ ┌───────────────┐     file/mic/url     ┌───────────────────────┐
+ │   Gradio UI   │  ──────────────────▶ │  process_audio(...)    │
+ └──────┬────────┘                      └──────────┬─────────────┘
+        │                                        validates/reads
+        │                             ┌───────────────────────────┐
+        │                             │ encode_audio(...),        │
+        │                             │ download_wav_from_url(...)│
+        │                             └──────────┬────────────────┘
+        │                                        │ base64 audio
+        ▼                                        ▼
+ ┌───────────────────────────┐        ┌─────────────────────────────┐
+ │ summarize_audio(audio,...)│  ───▶  │ Azure AIProjectClient →     │
+ └───────────────────────────┘        │ OpenAI Chat Completions     │
+                                      │ (multimodal: text + audio)  │
+                                      └─────────────────────────────┘
+```
 
-Getting Started
-Prerequisites
+---
 
-Python 3.8 or higher
-An Azure account with access to Azure AI Projects and OpenAI services
-A valid Azure endpoint and model deployment for OpenAI
-pip (Python package manager)
+## 📦 Requirements
 
-Installation
+- Python 3.10+
+- An Azure subscription with access to **Azure OpenAI** and an **AI Project** endpoint
+- Local login to Azure (for `DefaultAzureCredential`) or another supported credential method
 
-Clone the repository:git clone https://github.com/samir72/audio-summarizer-ui.git
+### Python Dependencies
 
+Create a `requirements.txt` (or copy/paste below):
 
-Navigate to the project directory:cd audio-summarizer-ui
+```txt
+azure-identity>=1.17.1
+azure-ai-projects>=1.0.0b6
+gradio>=4.44.0
+python-dotenv>=1.0.1
+requests>=2.32.3
+```
 
+Install:
 
-Create a virtual environment (optional but recommended):python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+```bash
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
 
+---
 
-Install dependencies:pip install -r requirements.txt
+## 🔐 Configuration
 
+This app uses environment variables loaded via `.env` and authenticates with `DefaultAzureCredential` (with environment and managed identity explicitly **disabled**). You’ll typically authenticate with **Azure CLI** locally.
 
-Set up environment variables:Create a .env file in the project root and add the following:AC_PROJECT_ENDPOINT=your_azure_project_endpoint
-AC_MODEL_DEPLOYMENT=your_openai_model_deployment
+1) **Create `.env`** at the project root:
 
-Replace your_azure_project_endpoint and your_openai_model_deployment with your Azure AI project endpoint and model deployment name, respectively.
-Ensure Azure credentials:The application uses DefaultAzureCredential for authentication. Ensure you have configured your Azure credentials (e.g., via Azure CLI or environment variables). Refer to Azure Identity documentation for details.
+```ini
+# Azure AI Project endpoint (from Azure AI Foundry / Project details)
+AC_PROJECT_ENDPOINT=https://<your-project>.projects.azure.com
 
-Usage
+# Your Azure OpenAI model deployment name (e.g., gpt-4o-realtime-preview, gpt-4o-mini, etc.)
+AC_MODEL_DEPLOYMENT=<your-model-deployment-name>
 
-Run the application:python app.py
+# Optional: Gradio host/port customization (if you modify demo.launch)
+GRADIO_SERVER_NAME=127.0.0.1
+GRADIO_SERVER_PORT=7860
+```
 
+2) **Login to Azure** (since `DefaultAzureCredential` will fall back to CLI auth):
 
-Open the Gradio interface in your browser (the URL will be displayed in the terminal, typically http://127.0.0.1:7860).
-Choose one of the following options:
-Upload a WAV or MP3 file.
-Record audio using your microphone.
-Enter a URL to a publicly accessible audio file.
+```bash
+az login
+az account set --subscription "<YOUR SUBSCRIPTION NAME OR ID>"
+```
 
+---
 
-Optionally, customize the System Prompt and User Prompt to guide the summarization process.
-Click Summarize to process the audio and view the generated summary.
+## ▶️ Running the App
 
-Example
+Save the provided Python code as, for example, `app.py`, then:
 
-System Prompt: "You are an AI assistant tasked with summarizing customer inquiries from audio recordings."
-User Prompt: "Summarize the key points of the audio content."
-Output: A concise text summary of the audio content.
+```bash
+python app.py
+```
 
-Contributing
-Contributions are welcome! To contribute:
+Open the URL printed by Gradio (by default http://127.0.0.1:7860).
 
-Fork the repository.
-Create a feature branch (git checkout -b feature/YourFeature).
-Commit your changes (git commit -m 'Add YourFeature').
-Push to the branch (git push origin feature/YourFeature).
-Open a Pull Request.
+---
 
-Please adhere to the Code of Conduct and review the Contributing Guidelines.
-License
-Distributed under the MIT License. See LICENSE for more information.
-Contact
-Your Name - syedamirhusain@gmail.com
-Project Link: https://github.com/samir72/audio-summarizer-ui
-Acknowledgments
+## 🧪 How to Use
 
-Gradio for the easy-to-use UI framework
-Azure AI for powerful AI capabilities
-OpenAI for advanced language models
-Best-README-Template for README inspiration
+1. **Choose an input method**:
+   - **Upload WAV File** – select a local file.
+   - **Record Audio** – record from your microphone.
+   - **Enter URL** – paste a direct link to an audio file (WAV/MP3).
+
+2. **Prompts**:
+   - **System Prompt** (defaults provided): sets assistant behavior.
+   - **User Prompt** (e.g., “Summarize the audio content”).  
+
+3. Click **Summarize**. The summary text appears in the **Summary** box.
+
+---
+
+## 🧩 Code Walkthrough (key parts)
+
+- **process_audio(...)** → orchestrates input selection, reads/encodes audio, calls summarizer  
+- **encode_audio(...)** → handles base64 encoding for file or memory  
+- **download_wav_from_url(...)** → fetches bytes from URL  
+- **summarize_audio(...)** → calls Azure OpenAI Chat Completions with text + audio input  
+
+---
+
+## ✅ Environment & Azure Setup Checklist
+
+- [ ] `.env` contains valid `AC_PROJECT_ENDPOINT` and `AC_MODEL_DEPLOYMENT`  
+- [ ] Your Azure identity has **Reader/Contributor** on the AI Project and **can access** the model deployment  
+- [ ] `az login` succeeded and the correct subscription is selected  
+- [ ] The chosen **model deployment** supports **audio input** (multimodal)
+
+---
+
+## 🔧 Troubleshooting
+
+- **Credential errors** → ensure `az login` and subscription are set  
+- **Model/Deployment not found** → verify deployment name & multimodal support  
+- **HTTP 403/401** → check Azure RBAC roles (e.g., Cognitive Services OpenAI User)  
+- **Temp file issues** → adjust code to manage downloaded audio as files
+
+---
+
+## 🧹 Improvements & TODOs
+
+- Align audio format (`wav` vs `mp3`) in UI and request  
+- Handle temp files more robustly  
+- Add better error handling and user feedback  
+- Support multi-turn conversations instead of single prompts  
+
+---
+
+## 🧰 Project Structure (suggested)
+
+```
+.
+├─ app.py
+├─ requirements.txt
+├─ .env
+├─ README.md
+└─ LICENSE
+```
+
+---
+
+## 📄 License
+
+MIT License
+
+Copyright (c) 2025 Sayed Amir Rizvi
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
