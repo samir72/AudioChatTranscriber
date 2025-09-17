@@ -55,7 +55,7 @@ def summarize_audio_b64(audio_b64: str, sys_prompt: str, user_prompt: str) -> st
         return response.choices[0].message.content
 
     except Exception as ex:
-        return f"Error from Azure OpenAI: {ex}"
+        return print(f"Error from Azure OpenAI: {ex}")
 
 
 # --- I/O helpers ------------------------------------------------------------
@@ -92,6 +92,10 @@ def process_audio(upload_path, record_path, url, sys_prompt, user_prompt):
 
         audio_b64 = encode_audio_from_path(audio_path)
         return summarize_audio_b64(audio_b64, sys_prompt, user_prompt)
+
+    except Exception as e:
+        return print(f"Error processing audio at {datetime.now()}: prompt_length={len(user_prompt)}, audio_path={audio_path}: {str(e)}")
+        
 
     finally:
         for p in tmp_to_cleanup:
@@ -130,6 +134,26 @@ with gr.Blocks(title="Audio Summarizer") as demo:
     submit_btn = gr.Button("Summarize")
     output = gr.Textbox(label="Summary", lines=12)
 
+    # Capture inputs for logging
+    if upload_audio:
+        upload_audio.change(
+            fn=lambda x: print(f"Upload audio selected: {x}"),
+            inputs=[upload_audio],
+            outputs=[],
+            # Reset other inputs to avoid confusion
+        )
+    if record_audio:
+        record_audio.change(
+            fn=lambda x: print(f"Record audio selected: {x}"),
+            inputs=[record_audio],
+            outputs=[],
+        )
+    if url_input:
+        url_input.change(
+            fn=lambda x: print(f"URL input changed: {x}"),
+            inputs=[url_input],
+            outputs=[],
+        )
     submit_btn.click(
         fn=process_audio,
         inputs=[upload_audio, record_audio, url_input, sysprompt_input, userprompt_input],
