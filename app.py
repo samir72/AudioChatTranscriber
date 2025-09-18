@@ -6,6 +6,7 @@ from datetime import datetime
 import gradio as gr
 from dotenv import load_dotenv
 from openai import AzureOpenAI  # official OpenAI SDK, works with Azure endpoints
+import json
 
 # --- LLM call (Azure OpenAI with API key) -----------------------------------
 
@@ -22,6 +23,7 @@ def summarize_audio_b64(audio_b64: str, sys_prompt: str, user_prompt: str) -> st
 
     if not endpoint or not api_key or not deployment:
         return "Server misconfiguration: required env vars missing."
+    
 
     try:
         client = AzureOpenAI(
@@ -56,8 +58,30 @@ def summarize_audio_b64(audio_b64: str, sys_prompt: str, user_prompt: str) -> st
 
     except Exception as ex:
         return print(f"Error from Azure OpenAI: {ex}")
+        #pass
 
+#----Retrieve meta data from metadata.json file------------------------------
+def retrieve_file_path(file_name):
+    path = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(path, file_name)
+    if os.path.isfile(file_path):
+        return file_path
+    elif not os.path.exists(file_path):
+        print(f"'{file_path}' does not exist.")
+        return None
+    return None
 
+def retrieve_json_record(file_path, record_id):
+    with open(file_path, 'r') as file:
+        data = json.load(file)
+        if isinstance(data, list):
+            for record in data:
+                if record.get('metadata', {}).get('id') == record_id:
+                    return record
+        elif isinstance(data, dict):
+            if data.get('metadata', {}).get('id') == record_id:
+                return data
+    return None
 # --- I/O helpers ------------------------------------------------------------
 
 def encode_audio_from_path(path: str) -> str:
@@ -120,15 +144,31 @@ with gr.Blocks(title="Audio Summarizer") as demo:
         with gr.Column():
             url_input = gr.Textbox(label="mp3 URL", placeholder="https://example.com/audio.mp3")
 
+    ### Get system and user prompts from metadata.json file
+    file_name = 'metadata.json'
+    record_id = '1'
+    file_path = retrieve_file_path(file_name)
+    
+    jsonrecord = retrieve_json_record(file_path, record_id)
+    if jsonrecord:
+        print(json.dumps(jsonrecord, indent=2))
+    else:
+        print("Record not found.")
+
+    sysprompt_default = jsonrecord['metadata']['content']['system_prompt']['content']
+    userprompt_default = jsonrecord['metadata']['content']['user_prompt']['content']
+
     with gr.Row():
         userprompt_input = gr.Textbox(
             label="User Prompt",
-            value="Summarize the audio content",
+            #value="Summarize the audio content",
+            value=userprompt_default,
             placeholder="e.g., Extract key points and action items",
         )
         sysprompt_input = gr.Textbox(
             label="System Prompt",
-            value="You are an AI assistant with a listening charter to clearly analyze the customer enquiry.",
+            #value="You are an AI assistant with a charter to clearly analyze the customer enquiry.",
+            value=sysprompt_default,
         )
 
     submit_btn = gr.Button("Summarize")
