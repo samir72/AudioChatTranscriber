@@ -139,8 +139,13 @@ def process_audio(upload_path, record_path, url, sys_prompt, user_prompt):
         elif record_path:
             audio_path = record_path
         elif url and url.strip():
+            # Check dns resolution of the url domain
+            domain = Youtubetranscription_summarizer.extract_domain(url)
+            if domain:
+                Youtubetranscription_summarizer.nslookup(domain)  # Check DNS resolution of the domain
             #Check if it's a youtube url
             CheckURL = re.search(r"Youtube", url, re.IGNORECASE)
+            
             if CheckURL:
                 # Get the transcription from youtube
                 text_input = Youtubetranscription_summarizer.main(url.strip()) # Youtube files are transcribed and summarized

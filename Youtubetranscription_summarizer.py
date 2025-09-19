@@ -18,15 +18,34 @@ def main(url:str):
     #Summarize the transcript using Phi
     return transcript
 
+import socket
+
+def nslookup(domain):
+    try:
+        # Perform DNS lookup for the domain
+        addresses = socket.getaddrinfo(domain, None)
+        print(f"DNS lookup succesfull for {domain}:")
+        # for addr in addresses:
+        #     # Extract IP address from the result
+        #     ip = addr[4][0]
+        #     print(f"IP Address: {ip}")
+    except socket.gaierror as e:
+        print(f"DNS lookup failed for {domain}: {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+
+def extract_domain(url):
+    # Regular expression to match the domain name
+    # Matches http:// or https://, followed by the domain (e.g., audio-samples.github.io)
+    pattern = r'https?://([a-zA-Z0-9.-]+)'
+    match = re.search(pattern, url)
+    if match:
+        return match.group(1)
+    else:
+        return None
+    
 def get_video_id(url:str)->str:
-    # prompt = input("Enter YouTube URL\n")
-    # if prompt:
-    #     url = prompt
-    # elif prompt.lower() == "quit":
-    #     return None
-    # elif len(prompt) == 0:
-    #     print("Please enter a YouTube URL.\n")
-    #     return None
+    # Extract video ID from various YouTube URL formats
     m = re.search(r"(?:v=|/shorts/|/live/|/embed/)([A-Za-z0-9_-]{6,})", url)
     return m.group(1) if m else str(abs(hash(url)))
 
