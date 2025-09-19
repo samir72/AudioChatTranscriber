@@ -7,12 +7,15 @@ import gradio as gr
 from dotenv import load_dotenv
 from openai import AzureOpenAI  # official OpenAI SDK, works with Azure endpoints
 import json
+import subprocess
+import Youtubetranscription_summarizer
+import re
 
 # --- LLM call (Azure OpenAI with API key) -----------------------------------
 
-def summarize_audio_b64(audio_b64: str, sys_prompt: str, user_prompt: str) -> str:
+def summarize_input(audio_b64: str = None, text_input: str = None, sys_prompt: str = None, user_prompt: str = None) -> str:
     """
-    Calls Azure OpenAI Chat Completions with audio input (base64 mp3).
+    Calls Azure OpenAI Chat Completions with audio input (base64 mp3) or text input, or both.
     """
     load_dotenv()
 
@@ -23,8 +26,8 @@ def summarize_audio_b64(audio_b64: str, sys_prompt: str, user_prompt: str) -> st
 
     if not endpoint or not api_key or not deployment:
         return "Server misconfiguration: required env vars missing."
-    
-
+    # Reset json_text for logging
+    json_text = ""
     try:
         client = AzureOpenAI(
             api_key=api_key,
@@ -35,30 +38,56 @@ def summarize_audio_b64(audio_b64: str, sys_prompt: str, user_prompt: str) -> st
         system_message = sys_prompt.strip() if sys_prompt else (
             "You are an AI assistant with a charter to clearly analyze the customer enquiry."
         )
-        user_text = user_prompt.strip() if user_prompt else "Summarize the audio content."
+        user_text = user_prompt.strip() if user_prompt else (
+            "Summarize the provided content." if audio_b64 or text_input else "No input provided."
+        )
 
+        content = [{"type": "text", "text": user_text}]
+        
+        if audio_b64:
+            content.append({
+                "type": "input_audio",
+                "input_audio": {"data": audio_b64, "format": "mp3"},
+            })
+        if text_input is not None:
+            # Debugging: Print the type and value of text_input
+            #print(f"Debug: text_input type={type(text_input)}, value={text_input}")
+            if isinstance(text_input, str):
+                try:
+                    # Try to parse the string as JSON to see if it's a list or dict
+                    parsed = json.loads(text_input)
+                    if isinstance(parsed, (list, dict)):
+                        # If it's a list or dict, convert back to JSON string
+                        content.append({"type": "text", "text": json.dumps(parsed)})
+                    else:
+                        # If it's a string but not a JSON list/dict, use it as-is
+                        content.append({"type": "text", "text": text_input})
+                except json.JSONDecodeError:
+                    # If it's not valid JSON, treat it as a regular string
+                    content.append({"type": "text", "text": text_input})
+            elif isinstance(text_input, (list, dict)):
+                try:
+                    # Convert list or dict to JSON-formatted string
+                    json_text = json.dumps(text_input)
+                    content.append({"type": "text", "text": json_text})
+                except (TypeError, ValueError):
+                    return "Error: text_input (list or dict) could not be converted to JSON."
+            else:
+                return f"Error: text_input must be a string, list, or dict, got {type(text_input)}."
+            
         response = client.chat.completions.create(
             model=deployment,
             messages=[
                 {"role": "system", "content": system_message},
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": user_text},
-                        {
-                            "type": "input_audio",
-                            "input_audio": {"data": audio_b64, "format": "mp3"},
-                        },
-                    ],
-                },
+                {"role": "user", "content": content},
             ],
         )
-        print(f"Azure API call at {datetime.now()}: prompt_length={len(user_prompt)}, audio_size={len(audio_b64)}")
+        print(f"Azure API call at {datetime.now()}: prompt_length={len(user_prompt or '')}, "
+              f"audio_size={len(audio_b64 or '')}, text_input_size={len(json_text or '')}")
         return response.choices[0].message.content
 
     except Exception as ex:
         return print(f"Error from Azure OpenAI: {ex}")
-        #pass
 
 #----Retrieve meta data from metadata.json file------------------------------
 def retrieve_file_path(file_name):
@@ -101,6 +130,8 @@ def download_to_temp_mp3(url: str) -> str:
 
 def process_audio(upload_path, record_path, url, sys_prompt, user_prompt):
     tmp_to_cleanup = []
+    audio_b64 = None
+    text_input = None
     try:
         audio_path = None
         if upload_path:
@@ -108,14 +139,21 @@ def process_audio(upload_path, record_path, url, sys_prompt, user_prompt):
         elif record_path:
             audio_path = record_path
         elif url and url.strip():
-            audio_path = download_to_temp_mp3(url.strip())
-            tmp_to_cleanup.append(audio_path)
-
-        if not audio_path:
-            return "Please provide an audio file via upload, recording, or URL."
-
-        audio_b64 = encode_audio_from_path(audio_path)
-        return summarize_audio_b64(audio_b64, sys_prompt, user_prompt)
+            #Check if it's a youtube url
+            CheckURL = re.search(r"Youtube", url, re.IGNORECASE)
+            if CheckURL:
+                # Get the transcription from youtube
+                text_input = Youtubetranscription_summarizer.main(url.strip()) # Youtube files are transcribed and summarized
+                tmp_to_cleanup.append(text_input)
+            else:   
+                audio_path = download_to_temp_mp3(url.strip())
+                tmp_to_cleanup.append(audio_path)
+        if not audio_path and text_input is None:
+            return "Please provide content via upload, recording, or URL."
+        # If we have an audio file, encode it
+        if audio_path:
+            audio_b64 = encode_audio_from_path(audio_path)
+        return summarize_input(audio_b64, text_input, sys_prompt, user_prompt)
 
     except Exception as e:
         return print(f"Error processing audio at {datetime.now()}: prompt_length={len(user_prompt)}, audio_path={audio_path}: {str(e)}")
@@ -134,7 +172,8 @@ def process_audio(upload_path, record_path, url, sys_prompt, user_prompt):
 
 with gr.Blocks(title="Audio Summarizer") as demo:
     gr.Markdown("# Audio File Summarizer (Azure OpenAI)")
-    gr.Markdown("Upload a mp3, record audio, or paste a URL. The app sends base64 audio to Azure OpenAI.")
+    gr.Markdown("Upload an mp3(**YouTube is the new feature add**), record audio, or paste a URL, use the default user prompt and system prompt and  click 'Summarize'.")
+    gr.Markdown("Users are encouraged to modify the user and system prompts to suit their needs.")
 
     with gr.Row():
         with gr.Column():
@@ -142,7 +181,7 @@ with gr.Blocks(title="Audio Summarizer") as demo:
         with gr.Column():
             record_audio = gr.Audio(sources=["microphone"], type="filepath", label="Record Audio")
         with gr.Column():
-            url_input = gr.Textbox(label="mp3 URL", placeholder="https://example.com/audio.mp3")
+            url_input = gr.Textbox(label="YouTube or standard mp3 URL", placeholder="https://example.com/audio.mp3")
 
     ### Get system and user prompts from metadata.json file
     file_name = 'metadata.json'
