@@ -13,7 +13,7 @@ import re
 
 # --- LLM call (Azure OpenAI with API key) -----------------------------------
 
-def summarize_input(audio_b64: str = None, text_input: str = None, sys_prompt: str = None, user_prompt: str = None) -> str:
+def summarize_input(audio_b64: str = None, text_input: str = None, sys_prompt: str = None, user_prompt: str = None, Starttime: datetime = None) -> str:
     """
     Calls Azure OpenAI Chat Completions with audio input (base64 mp3) or text input, or both.
     """
@@ -82,7 +82,9 @@ def summarize_input(audio_b64: str = None, text_input: str = None, sys_prompt: s
                 {"role": "user", "content": content},
             ],
         )
-        print(f"Azure API call at {datetime.now()}: prompt_length={len(user_prompt or '')}, "
+        Enddate = datetime.now()
+        Callduration = Enddate - Starttime[0]
+        print(f"Azure API call with a duration of {Callduration}: prompt_length={len(user_prompt or '')}, "
               f"audio_size={len(audio_b64 or '')}, text_input_size={len(json_text or '')}")
         return response.choices[0].message.content
 
@@ -132,7 +134,11 @@ def process_audio(upload_path, record_path, url, sys_prompt, user_prompt):
     tmp_to_cleanup = []
     audio_b64 = None
     text_input = None
+    domaincheck = None
     try:
+        # Capture start time for logging
+        Starttime = datetime.now(),
+        print(f"Azure API call starts at {datetime.now()}"),
         audio_path = None
         if upload_path:
             audio_path = upload_path
@@ -142,23 +148,29 @@ def process_audio(upload_path, record_path, url, sys_prompt, user_prompt):
             # Check dns resolution of the url domain
             domain = Youtubetranscription_summarizer.extract_domain(url)
             if domain:
-                Youtubetranscription_summarizer.nslookup(domain)  # Check DNS resolution of the domain
-            #Check if it's a youtube url
-            CheckURL = re.search(r"Youtube", url, re.IGNORECASE)
+                domaincheck = Youtubetranscription_summarizer.nslookup(domain)  # Check DNS resolution of the domain
+            else:
+                return "Invalid URL format."
             
-            if CheckURL:
-                # Get the transcription from youtube
-                text_input = Youtubetranscription_summarizer.main(url.strip()) # Youtube files are transcribed and summarized
-                tmp_to_cleanup.append(text_input)
-            else:   
-                audio_path = download_to_temp_mp3(url.strip())
-                tmp_to_cleanup.append(audio_path)
+            if domaincheck:
+                # Check if the url is a youtube link
+                CheckURL = re.search(r"Youtube", url, re.IGNORECASE)
+                
+                if CheckURL:
+                    # Get the transcription from youtube
+                    text_input = Youtubetranscription_summarizer.main(url.strip()) # Youtube files are transcribed and summarized
+                    tmp_to_cleanup.append(text_input)
+                else:   
+                    audio_path = download_to_temp_mp3(url.strip())
+                    tmp_to_cleanup.append(audio_path)
+            else:
+                return f"DNS lookup failed for {domain}"
         if not audio_path and text_input is None:
             return "Please provide content via upload, recording, or URL."
         # If we have an audio file, encode it
         if audio_path:
             audio_b64 = encode_audio_from_path(audio_path)
-        return summarize_input(audio_b64, text_input, sys_prompt, user_prompt)
+        return summarize_input(audio_b64, text_input, sys_prompt, user_prompt, Starttime)
 
     except Exception as e:
         return print(f"Error processing audio at {datetime.now()}: prompt_length={len(user_prompt)}, audio_path={audio_path}: {str(e)}")

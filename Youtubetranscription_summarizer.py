@@ -25,14 +25,17 @@ def nslookup(domain):
         # Perform DNS lookup for the domain
         addresses = socket.getaddrinfo(domain, None)
         print(f"DNS lookup succesfull for {domain}:")
+        return True
         # for addr in addresses:
         #     # Extract IP address from the result
         #     ip = addr[4][0]
         #     print(f"IP Address: {ip}")
     except socket.gaierror as e:
         print(f"DNS lookup failed for {domain}: {e}")
+        return False
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
+        return False
 
 def extract_domain(url):
     # Regular expression to match the domain name
@@ -146,12 +149,14 @@ def download_youtube_audio_wav16k_api(
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.extract_info(youtube_url, download=True)
     except Exception as e:
-        raise YTDLPError(f"yt-dlp API failed: {e}") from e
+        #raise YTDLPError(f"yt-dlp API failed: {e}") from e
+        return f"yt-dlp API failed: {e}"
 
     # Locate the produced WAV (pre-downsampled)
     pre_wavs = list(work_dir.glob("*.wav"))
     if not pre_wavs:
-        raise YTDLPError("yt-dlp completed but no WAV was found.")
+        #raise YTDLPError("yt-dlp completed but no WAV was found.")
+        return "yt-dlp completed but no WAV was found."
     pre_wav = max(pre_wavs, key=lambda p: p.stat().st_mtime)
 
     # Second stage: force 16 kHz mono via ffmpeg
@@ -171,7 +176,8 @@ def download_youtube_audio_wav16k_api(
             text=True,
         )
     except subprocess.CalledProcessError as e:
-        raise YTDLPError(f"ffmpeg failed to resample: {e.stderr or e.stdout}") from e
+        #raise YTDLPError(f"ffmpeg failed to resample: {e.stderr or e.stdout}") from e
+        return f"ffmpeg failed to resample: {e.stderr or e.stdout}"
 
     # Clean up intermediates if desired
     if not keep_intermediate:
