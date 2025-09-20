@@ -5,6 +5,7 @@ AudioSummarizer is a web application deployed on Hugging Face Spaces that summar
 
 ## Features
 - Upload a local MP3 file, record audio via microphone, or provide a YouTube or standard MP3 URL.
+- Create your own system and user prompts.
 - Transcribes YouTube videos using faster-whisper and summarizes audio or text using Phi-4-multimodal-instruct on Azure.
 - Configurable system and user prompts, with defaults loaded from metadata.json for structured output (Summary, Key Details, Insights).
 - Clean and minimal Gradio UI for easy interaction.
