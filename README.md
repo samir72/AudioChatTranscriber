@@ -185,4 +185,4 @@ MIT License - see [LICENSE](./LICENSE)
 
 
 ## Contact
-For questions or feedback, contact Sayed A Rizvi @ syedamirhusain@gmail.com
+For questions or feedback, contact Sayed Amir Rizvi @ syedamirhusain@gmail.com
